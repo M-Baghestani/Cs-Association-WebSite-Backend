@@ -1075,11 +1075,12 @@ export const getEventBySlug = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 3. ثبت‌نام در رویداد
 export const registerForEvent = async (req: AuthRequest, res: Response) => {
     const { id } = req.params; 
-    const userId = req.user.id; 
-    const { pricePaid, trackingCode, receiptImage } = req.body; 
+    const userId = req.user.id;
+    
+    // 👇 دریافت شماره و تلگرام به جای کد رهگیری
+    const { pricePaid, receiptImage, mobile, telegram } = req.body; 
 
     try {
         const event = await Event.findById(id); 
@@ -1087,45 +1088,49 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
 
         const registrationsCount = await Registration.countDocuments({ event: id, status: { $in: ['VERIFIED', 'PENDING'] } });
         if (registrationsCount >= event.capacity) {
-            return res.status(400).json({ success: false, message: 'ظرفیت رویداد تکمیل شده است.' });
+            return res.status(400).json({ success: false, message: 'ظرفیت تکمیل است.' });
         }
 
         const existingReg = await Registration.findOne({ 
             event: id, 
             user: userId,
-            status: { $in: ['VERIFIED', 'PENDING'] } 
+            status: 'VERIFIED'
         });
         
         if (existingReg) {
-            return res.status(400).json({ success: false, message: existingReg.status === 'VERIFIED' ? 'شما قبلاً ثبت‌نام تأیید شده در این رویداد دارید.' : 'درخواست ثبت‌نام شما در انتظار تأیید است.' });
+            return res.status(400).json({ success: false, message: 'قبلاً ثبت‌نام کرده‌اید.' });
         }
         
         let priceToStore = pricePaid ?? event.price;
         let newStatus = event.isFree ? 'VERIFIED' : 'PENDING';
 
-        const registration = await Registration.create({
-            user: userId, 
-            event: id, 
-            status: newStatus,
-            pricePaid: priceToStore,
-            trackingCode: trackingCode || null, 
-            receiptImage: receiptImage || null,
-            registeredAt: new Date(),
-        });
+        // 👇 ذخیره فیلدهای جدید در دیتابیس
+        const registration = await Registration.findOneAndUpdate(
+            { user: userId, event: id },
+            {
+                status: newStatus,
+                pricePaid: priceToStore,
+                receiptImage: receiptImage || null,
+                mobile: mobile || '',       // ذخیره شماره
+                telegram: telegram || '',   // ذخیره تلگرام
+                registeredAt: new Date(),
+            },
+            { new: true, upsert: true, runValidators: true }
+        );
         
         if (newStatus === 'VERIFIED') {
              await Event.findByIdAndUpdate(id, { $inc: { registeredCount: 1 } });
         }
 
         const message = event.isFree 
-            ? 'ثبت‌نام با موفقیت انجام شد.' 
-            : 'درخواست پرداخت شما ثبت شد و منتظر تأیید بمانید.';
+            ? 'ثبت‌نام موفق.' 
+            : 'اطلاعات ثبت شد. منتظر تأیید باشید.';
 
         return res.status(200).json({ success: true, message, registration });
 
     } catch (error: any) { 
         console.error('Registration Error:', error); 
-        return res.status(500).json({ success: false, message: 'خطای داخلی سرور هنگام ثبت‌نام.' });
+        return res.status(500).json({ success: false, message: 'خطای سرور.' });
     }
 };
 
