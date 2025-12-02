@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-// 👇 ایمپورت کلید مرکزی
 import { JWT_SECRET_KEY } from '../config/secrets';
 import User from '../models/User';
+
+
+
+
+
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -21,10 +25,8 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
     }
 
     try {
-        // 🚨 FIX: استفاده از کلید مرکزی برای باز کردن توکن
         const decoded: any = jwt.verify(token, JWT_SECRET_KEY);
         
-        // اطمینان از اینکه کاربر در دیتابیس وجود دارد
         const user = await User.findById(decoded.id).select('-password');
         if (!user) {
             return res.status(401).json({ success: false, message: 'کاربر این توکن دیگر وجود ندارد.' });
@@ -53,7 +55,6 @@ export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFu
                 req.user = user;
             }
         } catch (error) {
-            // توکن نامعتبر است، مهم نیست (چون اختیاری است)
         }
     }
     next();

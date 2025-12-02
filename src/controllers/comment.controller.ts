@@ -3,14 +3,16 @@ import Comment from '../models/Comment';
 import Post from '../models/Post';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-// ------------------------------------
-// A. ارسال نظر جدید توسط کاربر (Public)
-// ------------------------------------
+
+
+
+
+
+
 export const submitComment = async (req: AuthRequest, res: Response) => {
     const { postId } = req.params;
     const { content } = req.body;
     
-    // 🚨 FIX: استفاده از 'id' به جای '_id' (بر اساس ساختار توکن)
     const userId = req.user.id; 
 
     try {
@@ -21,11 +23,9 @@ export const submitComment = async (req: AuthRequest, res: Response) => {
             post: postId,
             user: userId,
             content: content,
-            isApproved: false, // ابتدا در انتظار تأیید ادمین است
+            isApproved: false, 
         });
         
-        // افزایش شمارنده کامنت‌ها (اختیاری - فعلاً غیرفعال تا از همگام‌سازی مطمئن شویم)
-        // await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
 
         res.status(201).json({ success: true, message: 'نظر شما ثبت شد و در انتظار تأیید است.' });
     } catch (error) {
@@ -34,13 +34,9 @@ export const submitComment = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// ------------------------------------
-// B. دریافت کامنت‌های یک پست (Public)
-// ------------------------------------
 export const getPostComments = async (req: Request, res: Response) => {
     const { postId } = req.params;
     try {
-        // فقط کامنت‌های تأیید شده را نشان بده
         const comments = await Comment.find({ post: postId, isApproved: true })
             .populate('user', 'name') 
             .sort({ createdAt: 1 }); 
@@ -51,9 +47,6 @@ export const getPostComments = async (req: Request, res: Response) => {
     }
 };
 
-// ------------------------------------
-// C. دریافت کامنت‌های در انتظار تأیید (Admin)
-// ------------------------------------
 export const getPendingComments = async (req: AuthRequest, res: Response) => {
     try {
         const pendingComments = await Comment.find({ isApproved: false })
@@ -67,16 +60,13 @@ export const getPendingComments = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// ------------------------------------
-// D. پاسخ ادمین و تأیید نهایی (Admin)
-// ------------------------------------
 export const replyAndApproveComment = async (req: AuthRequest, res: Response) => {
     const { commentId } = req.params;
     const { replyContent } = req.body; 
 
     try {
         const updateFields: any = {
-            isApproved: true, // تأیید نظر کاربر
+            isApproved: true,
         };
         
         if (replyContent && replyContent.trim().length > 0) {
@@ -107,9 +97,6 @@ export const replyAndApproveComment = async (req: AuthRequest, res: Response) =>
 };
 
 
-// ------------------------------------
-// E. حذف نظر (Admin)
-// ------------------------------------
 export const deleteComment = async (req: AuthRequest, res: Response) => {
     const { commentId } = req.params;
 

@@ -12,6 +12,7 @@ import uploadRoutes from './routes/upload.routes';
 import path from 'path';
 import adminRoutes from './routes/admin.routes';
 import commentRoutes from './routes/comment.routes';
+import journalRoutes from './routes/journal.routes'
 
 
 
@@ -46,7 +47,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/comments', commentRoutes);
-
+app.use('/api/journals', journalRoutes)
 
 
 

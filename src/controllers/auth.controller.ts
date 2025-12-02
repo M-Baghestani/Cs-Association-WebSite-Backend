@@ -2,9 +2,14 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-// 👇 ایمپورت کلید از فایل مرکزی
 import { JWT_SECRET_KEY } from '../config/secrets'; 
 import { AuthRequest } from '../middlewares/auth.middleware';
+
+
+
+
+
+
 
 export const register = async (req: Request, res: Response) => {
     try {
@@ -22,10 +27,9 @@ export const register = async (req: Request, res: Response) => {
             email,
             password: hashedPassword,
             phoneNumber: phoneNumber || '',
-            role: 'student' // نقش پیش‌فرض
+            role: 'student'
         });
 
-        // 🚨 FIX: استفاده از کلید مرکزی برای امضای توکن
         const token = jwt.sign(
             { id: user._id, role: user.role, name: user.name }, 
             JWT_SECRET_KEY, 
@@ -65,7 +69,6 @@ export const login = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'ایمیل یا رمز عبور اشتباه است' });
         }
 
-        // 🚨 FIX: استفاده از کلید مرکزی
         const token = jwt.sign(
             { id: user._id, role: user.role, name: user.name }, 
             JWT_SECRET_KEY, 

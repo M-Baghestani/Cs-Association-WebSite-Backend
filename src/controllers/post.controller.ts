@@ -41,7 +41,7 @@ export const deletePost = async (req: AuthRequest, res: Response) => {
         res.json({ success: true, message: 'پست و نظرات آن حذف شدند.' });
 
     } catch (error) {
-        console.error("🔥 DELETE ERROR DETAILS:", error); // این خط دلیل ارور 500 را لو می‌دهد
+        console.error("🔥 DELETE ERROR DETAILS:", error); 
         res.status(500).json({ success: false, message: 'خطای سرور در حذف.', error: error });
     }
 };

@@ -1,8 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-// ساختار هر پیام داخل تیکت
 const MessageSchema = new Schema({
-  sender: { type: String, enum: ['USER', 'ADMIN'], required: true }, // چه کسی پیام داده؟
+  sender: { type: String, enum: ['USER', 'ADMIN'], required: true }, 
   content: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });

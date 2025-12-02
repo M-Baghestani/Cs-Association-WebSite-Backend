@@ -101,7 +101,6 @@ export const editMessage = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ success: false, message: 'پیام یافت نشد.' });
         }
 
-        // آپدیت محتوا
         message.content = newContent;
         await contact.save();
 

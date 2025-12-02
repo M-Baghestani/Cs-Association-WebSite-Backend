@@ -1021,7 +1021,6 @@ import Registration from '../models/Registration';
 import User from '../models/User';
 import { AuthRequest } from '../middlewares/auth.middleware'; 
 
-// 1. دریافت لیست رویدادها
 export const getEvents = async (req: Request, res: Response) => {
     try {
         const events = await Event.find().sort({ date: 1 }).lean(); 
@@ -1041,7 +1040,6 @@ export const getEvents = async (req: Request, res: Response) => {
     }
 };
 
-// 2. دریافت رویداد با SLUG
 export const getEventBySlug = async (req: AuthRequest, res: Response) => {
     const { slug } = req.params;
     const userId = req.user?._id;
@@ -1079,7 +1077,6 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
     const { id } = req.params; 
     const userId = req.user.id;
     
-    // 👇 دریافت شماره و تلگرام به جای کد رهگیری
     const { pricePaid, receiptImage, mobile, telegram } = req.body; 
 
     try {
@@ -1104,15 +1101,14 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
         let priceToStore = pricePaid ?? event.price;
         let newStatus = event.isFree ? 'VERIFIED' : 'PENDING';
 
-        // 👇 ذخیره فیلدهای جدید در دیتابیس
         const registration = await Registration.findOneAndUpdate(
             { user: userId, event: id },
             {
                 status: newStatus,
                 pricePaid: priceToStore,
                 receiptImage: receiptImage || null,
-                mobile: mobile || '',       // ذخیره شماره
-                telegram: telegram || '',   // ذخیره تلگرام
+                mobile: mobile || '',      
+                telegram: telegram || '',   
                 registeredAt: new Date(),
             },
             { new: true, upsert: true, runValidators: true }
@@ -1134,7 +1130,6 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 4. ایجاد رویداد جدید
 export const createEvent = async (req: AuthRequest, res: Response) => {
     try {
         const { title, slug, description, date, location, capacity, isFree, price, thumbnail } = req.body; 
@@ -1150,7 +1145,6 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 5. دریافت رویداد با ID
 export const getEventById = async (req: Request, res: Response) => {
     try {
         const event = await Event.findById(req.params.id);
@@ -1161,7 +1155,6 @@ export const getEventById = async (req: Request, res: Response) => {
     }
 };
 
-// 6. ویرایش رویداد
 export const updateEvent = async (req: Request, res: Response) => {
     try {
         const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
@@ -1172,7 +1165,6 @@ export const updateEvent = async (req: Request, res: Response) => {
     }
 };
 
-// 7. دریافت ثبت‌نام‌های کاربر
 export const getMyRegistrations = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user.id; 
@@ -1187,7 +1179,6 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 8. دریافت وضعیت ثبت نام
 export const getRegistrationStatus = async (req: AuthRequest, res: Response) => {
     const { slug } = req.params; 
     const userId = req.user?.id; 
@@ -1226,7 +1217,6 @@ export const getRegistrationStatus = async (req: AuthRequest, res: Response) => 
     }
 };
 
-// 9. آپلود رسید (Upload Receipt)
 export const uploadReceipt = async (req: any, res: Response) => {
     const { id: eventId } = req.params;
     const userId = req.user.id;
@@ -1263,7 +1253,6 @@ export const uploadReceipt = async (req: any, res: Response) => {
     }
 };
 
-// 🚨 10. حذف رویداد (Delete Event) - اضافه شد
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
     try {
         const eventId = req.params.id;

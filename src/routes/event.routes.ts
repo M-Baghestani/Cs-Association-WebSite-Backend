@@ -98,19 +98,17 @@ import { protect, admin, optionalAuth } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Public/Read Routes (Highest Priority/Specificity)
 router.get('/', getEvents);
 
 router.get('/slug/:slug/status', optionalAuth, getRegistrationStatus); 
 router.get('/slug/:slug', optionalAuth, getEventBySlug); 
 
-router.get('/my-registrations', protect, getMyRegistrations); // روت لیست من
+router.get('/my-registrations', protect, getMyRegistrations); 
 router.get('/:id', getEventById); 
 router.post('/:id/register', protect, registerForEvent);
 router.put('/:id', protect, admin, updateEvent);
 router.delete('/:id', protect, admin, deleteEvent);
 
-// Admin Create
 router.post('/', protect, admin, createEvent);
 
 
