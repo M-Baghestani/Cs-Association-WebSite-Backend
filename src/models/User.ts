@@ -5,7 +5,10 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'admin' | 'student';
-  phoneNumber?: string; 
+  phoneNumber?: string;
+  
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema: Schema = new Schema({
@@ -16,6 +19,5 @@ const UserSchema: Schema = new Schema({
   
   phoneNumber: { type: String, unique: true, sparse: true }, 
   
-}, { timestamps: true });
-
+}, { timestamps: true }); 
 export default mongoose.model<IUser>('User', UserSchema);

@@ -13,7 +13,7 @@ import path from 'path';
 import adminRoutes from './routes/admin.routes';
 import commentRoutes from './routes/comment.routes';
 import journalRoutes from './routes/journal.routes'
-
+import userRoutes from './routes/user.routes';
 
 
 
@@ -23,8 +23,8 @@ connectDB();
 
 dotenv.config()
 const app: Application = express()
-const PORT = process.env.PORT || 5000;
-
+const PORT = parseInt(process.env.PORT || '5000', 10);
+const HOST = '0.0.0.0';
 app.use(compression());
 
 app.use(cors({ 
@@ -48,7 +48,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/journals', journalRoutes)
-
+app.use('/api/users', userRoutes);
 
 
 
@@ -62,6 +62,7 @@ app.get('/', (req: Request, res: Response) => {
 
 
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-})
+app.listen(PORT, HOST, () => {
+    console.log(`Application running on http://${HOST}:${PORT}`);
+    console.log(`Application is ready.`); 
+});

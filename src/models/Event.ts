@@ -31,7 +31,6 @@ const EventSchema: Schema = new Schema({
   registrationStatus: { 
     type: String, 
     enum: ['SCHEDULED', 'OPEN', 'CLOSED'], 
-    default: 'SCHEDULED', 
     required: true 
   },
   registrationOpensAt: { type: Date, default: Date.now },
