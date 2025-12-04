@@ -43,7 +43,7 @@ app.use('/api/events',eventRoutes)
 app.use('/api/posts', postRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/contact', contactRoutes);
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/comments', commentRoutes);

@@ -22,13 +22,16 @@ export const register = async (req: Request, res: Response) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const user = await User.create({
+        const userData = await User.create({
             name,
             email,
             password: hashedPassword,
-            phoneNumber: phoneNumber || '',
             role: 'student'
+            
         });
+
+        if (phoneNumber) userData.phoneNumber = phoneNumber;
+        const user = await User.create(userData);
 
         const token = jwt.sign(
             { id: user._id, role: user.role, name: user.name }, 
@@ -44,7 +47,9 @@ export const register = async (req: Request, res: Response) => {
                     id: user._id, 
                     name: user.name, 
                     email: user.email,
-                    role: user.role, 
+                    role: user.role,
+                    profileImage: user.profileImage, // Include new fields
+                    dateOfBirth: user.dateOfBirth,     // Include new fields
                     phoneNumber: user.phoneNumber || '' 
                 } 
             },
@@ -83,7 +88,9 @@ export const login = async (req: Request, res: Response) => {
                     id: user._id, 
                     name: user.name, 
                     email: user.email, 
-                    role: user.role,
+                    role: user.role, 
+                    profileImage: user.profileImage,
+                    dateOfBirth: user.dateOfBirth,
                     phoneNumber: user.phoneNumber || '' 
                 } 
             },
@@ -98,7 +105,7 @@ export const login = async (req: Request, res: Response) => {
 export const updateProfile = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user.id;
-        const { name, phoneNumber, password } = req.body;
+        const { name, phoneNumber, password, profileImage, dateOfBirth } = req.body;
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ success: false, message: 'کاربر یافت نشد' });
@@ -106,6 +113,10 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         if (name) user.name = name;
         if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
         
+        if (profileImage !== undefined) user.profileImage = profileImage;
+        if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
+
+
         if (password && password.trim().length > 0) {
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(password, salt);
@@ -116,7 +127,15 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         res.json({ 
             success: true, 
             message: 'پروفایل بروزرسانی شد', 
-            user: { id: user._id, name: user.name, email: user.email, role: user.role, phoneNumber: user.phoneNumber || '' } 
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role, 
+                phoneNumber: user.phoneNumber || '',
+                profileImage: user.profileImage,
+                dateOfBirth: user.dateOfBirth,
+            }
         });
 
     } catch (error) {

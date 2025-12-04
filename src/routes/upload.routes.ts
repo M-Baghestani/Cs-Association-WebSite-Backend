@@ -82,11 +82,11 @@ router.post('/', protect, upload.single('image'), (req: Request, res: Response) 
 
     // 🚨 FIX 3: لینک فایل مستقیماً از S3 می‌آید
     const uploadedFile = req.file as any;
-    const imageUrl = uploadedFile.location; 
+    const publicUrl = (req.file as any).location;
 
     res.json({
         success: true,
-        url: imageUrl // این لینک مستقیم S3 است
+        url: publicUrl
     });
 });
 
