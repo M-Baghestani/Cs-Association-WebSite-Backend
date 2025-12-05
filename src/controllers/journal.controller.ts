@@ -14,9 +14,16 @@ export const getJournals = async (req: Request, res: Response) => {
 export const getJournalById = async (req: Request, res: Response) => {
     try {
         const journal = await Journal.findById(req.params.id);
-        if (!journal) return res.status(404).json({ success: false, message: 'نشریه یافت نشد.' });
+        
+        if (!journal) {
+            return res.status(404).json({ success: false, message: 'نشریه یافت نشد.' });
+        }
+        
         res.json({ success: true, data: journal });
-    } catch (error) {
+    } catch (error: any) { 
+        if (error.name === 'CastError' && error.kind === 'ObjectId') {
+            return res.status(404).json({ success: false, message: 'نشریه یافت نشد.' });
+        }
         res.status(500).json({ success: false, message: 'خطای سرور' });
     }
 };
