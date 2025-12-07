@@ -1038,44 +1038,38 @@ export const getEvents = async (req: Request, res: Response) => {
 };
 
 export const getEventBySlug = async (req: AuthRequest, res: Response) => {
-  const { slug } = req.params;
-  const userId = req.user?._id;
-
-  try {
-    const event = await Event.findOne({ slug });
-    if (!event)
-      return res
-        .status(404)
-        .json({ success: false, message: "رویداد یافت نشد." });
-
-    let eventData: any = event.toObject();
-
-    const realCount = await Registration.countDocuments({
-      event: event._id,
-      status: { $in: ["VERIFIED", "PENDING"] },
-    });
-    eventData.registeredCount = realCount;
-
-    if (userId) {
-      const userRegistration = await Registration.findOne({
-        event: event._id,
-        user: userId,
-      }).select("status pricePaid trackingCode receiptImage");
-
-      eventData.userRegistration = userRegistration
-        ? userRegistration.toObject()
-        : null;
-    } else {
-      eventData.userRegistration = null;
-    }
-
-    res.status(200).json({ success: true, data: eventData });
-  } catch (error: any) {
-    console.error("Error fetching event by slug:", error);
-    res.status(500).json({ success: false, message: "خطای سرور" });
+ const { slug } = req.params;
+ // ✅ اصلاح: استفاده از .id به جای ._id برای هماهنگی با سایر کنترلرها و جلوگیری از خطای Mongoose
+ const userId = req.user?.id; 
+ try {
+  const event = await Event.findOne({ slug });
+  if (!event)
+   return res
+    .status(404)
+    .json({ success: false, message: "رویداد یافت نشد." });
+  let eventData: any = event.toObject();
+  const realCount = await Registration.countDocuments({
+   event: event._id,
+   status: { $in: ["VERIFIED", "PENDING"] },
+  });
+  eventData.registeredCount = realCount;
+  if (userId) {
+   const userRegistration = await Registration.findOne({
+    event: event._id,
+    user: userId,
+   }).select("status pricePaid trackingCode receiptImage");
+   eventData.userRegistration = userRegistration
+    ? userRegistration.toObject()
+    : null;
+  } else {
+   eventData.userRegistration = null;
   }
+  res.status(200).json({ success: true, data: eventData });
+ } catch (error: any) {
+  console.error("Error fetching event by slug:", error);
+  res.status(500).json({ success: false, message: "خطای سرور" });
+ }
 };
-
 export const registerForEvent = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user.id;
