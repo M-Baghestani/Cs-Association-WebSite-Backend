@@ -7,8 +7,9 @@ export interface IRegistration extends Document {
   status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'PAID';
   pricePaid: number;
   receiptImage?: string;
-  mobile?: string; 
+  mobile?: string;
   telegram?: string;
+  questions?: string[];
 }
 
 const RegistrationSchema: Schema = new Schema({
@@ -26,6 +27,7 @@ const RegistrationSchema: Schema = new Schema({
   
   mobile: { type: String },
   telegram: { type: String },
+  questions: [{ type: String }],
 
 }, { timestamps: true });
 

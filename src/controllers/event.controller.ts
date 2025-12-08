@@ -1010,6 +1010,12 @@ import Registration from "../models/Registration";
 import User from "../models/User";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
+
+
+
+
+
+
 export const getEvents = async (req: Request, res: Response) => {
   try {
     const events = await Event.find().sort({ date: 1 }).lean();
@@ -1074,7 +1080,7 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user.id;
 
-  const { pricePaid, receiptImage, mobile, telegram } = req.body;
+  const { pricePaid, receiptImage, mobile, telegram,questions } = req.body;
 
   try {
     const event = await Event.findById(id);
@@ -1108,6 +1114,10 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
     let priceToStore = pricePaid ?? event.price;
     let newStatus = event.isFree ? "VERIFIED" : "PENDING";
 
+    const validQuestions = Array.isArray(questions) 
+            ? questions.filter((q: string) => q.trim().length > 0) 
+            : [];
+
     const registration = await Registration.findOneAndUpdate(
       { user: userId, event: id },
       {
@@ -1116,6 +1126,7 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
         receiptImage: receiptImage || null,
         mobile: mobile || "",
         telegram: telegram || "",
+        questions: validQuestions,
         registeredAt: new Date(),
       },
       { new: true, upsert: true, runValidators: true }
@@ -1187,17 +1198,37 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getEventById = async (req: Request, res: Response) => {
-  try {
-    const event = await Event.findById(req.params.id);
-    if (!event)
-      return res
-        .status(404)
-        .json({ success: false, message: "رویداد یافت نشد" });
-    res.status(200).json({ success: true, data: event });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "خطای سرور" });
-  }
+export const getEventById = async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    try {
+        const event = await Event.findById(id);
+        if (!event) return res.status(404).json({ success: false, message: 'رویداد یافت نشد' });
+
+        let eventData: any = event.toObject();
+
+        const realCount = await Registration.countDocuments({
+            event: event._id,
+            status: { $in: ['VERIFIED', 'PENDING'] }
+        });
+        eventData.registeredCount = realCount;
+
+        if (userId) {
+            const userRegistration = await Registration.findOne({ event: event._id, user: userId })
+                .select('status pricePaid trackingCode receiptImage telegram questions');
+
+            eventData.userRegistration = userRegistration ? userRegistration.toObject() : null;
+        } else {
+             eventData.userRegistration = null;
+        }
+
+        res.status(200).json({ success: true, data: eventData });
+
+    } catch (error) {
+        console.error("Error fetching event by ID:", error);
+        res.status(500).json({ success: false, message: 'خطای سرور' });
+    }
 };
 
 export const updateEvent = async (req: Request, res: Response) => {

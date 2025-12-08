@@ -93,28 +93,24 @@ import {
   updateEvent,
   getEventById,
   getRegistrationStatus,
-  deleteEvent
+  deleteEvent,
 } from '../controllers/event.controller';
 
 import { protect, admin, optionalAuth } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// عمومی
 router.get('/', getEvents);
 
-// مسیرهای اسلاگ
 router.get('/slug/:slug/status', optionalAuth, getRegistrationStatus);
 router.get('/slug/:slug', optionalAuth, getEventBySlug);
 
-// مسیرهای آیدی
 router.get('/my-registrations', protect, getMyRegistrations);
-router.get('/:id', getEventById);
+router.get('/:id', optionalAuth, getEventById);
 router.post('/:id/register', protect, registerForEvent);
 router.put('/:id', protect, admin, updateEvent);
 router.delete('/:id', protect, admin, deleteEvent);
 
-// ساخت رویداد
 router.post('/', protect, admin, createEvent);
 
 export default router;
