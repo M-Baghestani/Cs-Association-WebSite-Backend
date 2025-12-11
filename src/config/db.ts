@@ -7,6 +7,19 @@ const connectDB = async () => {
     const conn = await mongoose.connect(dbUrl);
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+    try {
+      console.log("Attempting to drop old 'slug' index...");
+      await mongoose.connection.collection('events').dropIndex('slug_1');
+      console.log("✅ SUCCESS: Old 'slug' index dropped.");
+    } catch (err: any) {
+      if (err.code === 27) {
+        console.log("ℹ️ Index 'slug_1' not found (already dropped).");
+      } else {
+        console.log("⚠️ Note: Could not drop index (might be already gone):", err.message);
+      }
+    }
+
   } catch (error) {
     console.error(`Error: ${error}`);
     process.exit(1);

@@ -103,6 +103,25 @@ export const login = async (req: Request, res: Response) => {
     }
 };
 
+export const getProfile = async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "کاربر یافت نشد" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user, 
+    });
+  } catch (error) {
+    console.error("Get Profile Error:", error);
+    res.status(500).json({ success: false, message: "خطای سرور" });
+  }
+};
+
+
 export const updateProfile = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user.id;
@@ -149,58 +168,3 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     }
 };
 
-
-export const googleLogin = async (req: Request, res: Response) => {
-    const { idToken } = req.body;
-
-    if (!idToken || !GOOGLE_CLIENT_ID) {
-        return res.status(400).json({ success: false, message: 'توکن نامعتبر یا Google Client ID تنظیم نشده است.' });
-    }
-
-    try {
-        // 1. Verify the Google ID Token
-        const ticket = await client.verifyIdToken({
-            idToken: idToken,
-            audience: [GOOGLE_CLIENT_ID]
-        });
-        const payload = ticket.getPayload();
-
-        if (!payload || !payload.email) {
-            return res.status(400).json({ success: false, message: 'توکن گوگل اطلاعات کافی ندارد.' });
-        }
-
-        const { sub: googleId, email, name, picture } = payload;
-
-        // 2. Check if user exists by Google ID or Email
-        let user = await User.findOne({ $or: [{ email }, { googleId }] });
-
-        // 3. Register if user does not exist
-        if (!user) {
-            user = await User.create({
-                email,
-                name: name || 'کاربر گوگل',
-                googleId,
-                // Set a placeholder password since Mongoose requires it, but this user logs in via OAuth
-                password: await bcrypt.hash(googleId + Date.now().toString(), 10), 
-                role: 'student',
-                profileImage: picture,
-                phoneNumber: '',
-            });
-        } else if (!user.googleId) {
-            // If user exists via email but without googleId, link the accounts
-            user.googleId = googleId;
-            user.profileImage = user.profileImage || picture; // Preserve existing image if available
-            await user.save();
-        }
-
-        // 4. Issue local JWT
-        const token = jwt.sign({ id: user._id, role: user.role, name: user.name }, JWT_SECRET_KEY, { expiresIn: '30d' });
-
-        // 5. Send successful response (similar structure to regular login)
-        res.json({ success: true, data: { token, user: { id: user._id, name: user.name, email: user.email, role: user.role, phoneNumber: user.phoneNumber || '', profileImage: user.profileImage } } });
-
-    } catch (error) {
-        console.error("Google Login Error:", error);
-        res.status(500).json({ success: false, message: 'خطا در احراز هویت گوگل' });
-    }
-};

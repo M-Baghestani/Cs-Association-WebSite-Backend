@@ -1,95 +1,157 @@
-import { Router, Request, Response } from 'express'; 
+// src/routes/upload.route.ts
+import { Router, Request, Response } from 'express';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { protect } from '../middlewares/auth.middleware';
+import { upload } from '../middlewares/upload.middleware';
+import { s3Client } from '../utils/s3';
 import path from 'path';
-import multer from 'multer';
-import { protect } from '../middlewares/auth.middleware'; 
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import multerS3 from 'multer-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 
 const router = Router();
 
-const s3 = new S3Client({
-    region: 'us-east-1',
-    endpoint: process.env.S3_ENDPOINT,
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
-    forcePathStyle: true,
-});
+interface MulterRequest extends Request {
+    file?: Express.Multer.File;
+}
 
-// تعریف S3 Storage
-const s3Storage = multerS3({
-    s3: s3,
-    bucket: process.env.S3_BUCKET_NAME || 'cs-default-bucket',
-    acl: 'public-read', // اجازه دسترسی عمومی
-    key: (req: any, file: any, cb: any) => {
-        // نام فایل: (نوع فایل)/(زمان-عدد رندوم).(پسوند)
-        const fileExtension = path.extname(file.originalname);
-        const fileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-        cb(null, `uploads/${fileName}`);
-    }
-});
-
-
-const deleteFileFromS3 = async (req: Request, res: Response) => {
-    // در درخواست DELETE، داده‌ها در req.body ارسال می‌شوند
-    const { url } = req.body; 
-    
-    if (!url || !url.includes(process.env.S3_BUCKET_NAME!)) {
-        return res.status(400).json({ success: false, message: 'آدرس فایل نامعتبر است.' });
-    }
-    
+export const downloadJournal = async (req: Request, res: Response) => {
     try {
-        // استخراج نام فایل (Key) از URL ذخیره شده در دیتابیس
-        const urlParts = new URL(url);
-        // Key معمولاً شامل مسیر بعد از نام باکت است (مثلا /uploads/123.png)
-        const Key = urlParts.pathname.substring(1); 
+        const { fileKey } = req.query;
+        const bucketName = process.env.ARVAN_BUCKET_NAME!;
 
-        // 1. ارسال دستور حذف به S3
-        await s3.send(new DeleteObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME!,
-            Key: Key,
-        }));
+        // 1. لاگ برای دیباگ (حتماً در ترمینال چک کنید)
+        console.log("--- Download Request ---");
+        console.log("Raw Input:", fileKey);
 
-        res.json({ success: true, message: 'فایل با موفقیت از سرور حذف شد.' });
-    } catch (error) {
-        console.error("S3 Deletion Error:", error);
-        res.status(500).json({ success: false, message: 'خطا در حذف فایل از فضای ابری.' });
+        if (!fileKey || typeof fileKey !== 'string') {
+            return res.status(400).json({ message: "لینک فایل نامعتبر است" });
+        }
+
+        let finalKey = fileKey;
+
+        // 2. تمیزکاری هوشمند لینک
+        if (fileKey.startsWith('http')) {
+            try {
+                const urlObj = new URL(fileKey);
+                // گرفتن مسیر فایل (بدون دومین) و دیکد کردن (برای کاراکترهای فارسی و فاصله)
+                let path = decodeURIComponent(urlObj.pathname);
+                
+                // حذف اسلش اول اگر باشد
+                if (path.startsWith('/')) path = path.substring(1);
+
+                // حذف نام باکت از اول مسیر (اینجاست که معمولا باگ میخورد)
+                // اگر مسیر با اسم باکت شروع شده باشد، آن را حذف میکنیم
+                if (path.startsWith(`${bucketName}/`)) {
+                    path = path.replace(`${bucketName}/`, '');
+                } else if (path.startsWith(bucketName)) { // شاید بدون اسلش باشد
+                     path = path.replace(bucketName, '');
+                }
+
+                // حذف اسلش‌های اضافی احتمالی در شروع
+                while (path.startsWith('/')) {
+                    path = path.substring(1);
+                }
+
+                finalKey = path;
+            } catch (e) {
+                console.error("URL Parsing Error:", e);
+                // اگر نتوانست پارس کند، شاید خودش Key خالص بوده، پس دست نمیزنیم
+            }
+        }
+
+        console.log("Extracted Bucket:", bucketName);
+        console.log("Final Key for S3:", finalKey);
+
+        // 3. درخواست به S3
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: finalKey,
+            // هدر اجبار به دانلود
+            ResponseContentDisposition: `attachment; filename="${finalKey.split('/').pop()}"`,
+        });
+
+        const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // ۱ ساعت اعتبار
+        
+        // ریدارکت به لینک دانلود
+        res.redirect(downloadUrl);
+
+    } catch (error: any) {
+        console.error("Download Error Detail:", error);
+        
+        // اگر فایل پیدا نشد
+        if (error.name === 'NoSuchKey') {
+            return res.status(404).json({ message: "فایل مورد نظر در فضای ابری یافت نشد." });
+        }
+
+        res.status(500).json({ message: "خطا در تولید لینک دانلود" });
     }
 };
 
-// تعریف Multer با S3 Storage
-const upload = multer({ 
-    storage: s3Storage,
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
-    fileFilter: (req: any, file: any, cb: any) => {
-        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
-            cb(null, true);
-        } else {
-            cb(new Error('فقط فایل‌های تصویری و PDF مجاز هستند!'), false);
-        }
-    }
-});
-
-
-// ----------------------------------------------------
-// روت آپلود فایل
-// ----------------------------------------------------
-router.post('/', protect, upload.single('image'), (req: Request, res: Response) => {
+const uploadToArvan = async (req: MulterRequest, res: Response): Promise<any> => {
     if (!req.file) {
-        return res.status(400).json({ success: false, message: 'هیچ فایلی آپلود نشد' }); 
+        return res.status(400).json({ success: false, message: 'فایلی آپلود نشد.' });
     }
 
-    // 🚨 FIX 3: لینک فایل مستقیماً از S3 می‌آید
-    const uploadedFile = req.file as any;
-    const publicUrl = (req.file as any).location;
+    const bucketName = process.env.ARVAN_BUCKET_NAME!;
+    const endpoint = process.env.ARVAN_ENDPOINT!; // مثلا https://s3.ir-tbz-sh1.arvanstorage.ir
 
-    res.json({
-        success: true,
-        url: publicUrl
-    });
-});
+    try {
+        const fileExtension = path.extname(req.file.originalname);
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        const fileName = `uploads/${uniqueSuffix}${fileExtension}`;
 
+        const params = {
+            Bucket: bucketName,
+            Key: fileName,
+            Body: req.file.buffer, 
+            ContentType: req.file.mimetype,
+            ACL: 'public-read' as const, 
+        };
+
+        await s3Client.send(new PutObjectCommand(params));
+
+        const publicUrl = `${endpoint}/${bucketName}/${fileName}`;
+
+        res.json({
+            success: true,
+            message: 'آپلود موفقیت‌آمیز بود',
+            url: publicUrl
+        });
+
+    } catch (error) {
+        console.error("Upload Error:", error);
+        res.status(500).json({ success: false, message: 'خطا در آپلود فایل به فضای ابری.' });
+    }
+};
+
+const deleteFileFromS3 = async (req: Request, res: Response) => {
+    const { url } = req.body;
+    const bucketName = process.env.ARVAN_BUCKET_NAME!;
+
+    if (!url) return res.status(400).json({ success: false, message: 'آدرس فایل ارسال نشده است.' });
+
+    try {
+        const urlObj = new URL(url);
+        let fileKey = urlObj.pathname.substring(1);
+        
+        if (fileKey.startsWith(`${bucketName}/`)) {
+            fileKey = fileKey.replace(`${bucketName}/`, '');
+        }
+
+        await s3Client.send(new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: fileKey,
+        }));
+
+        res.json({ success: true, message: 'فایل حذف شد.' });
+    } catch (error) {
+        console.error("S3 Delete Error:", error);
+        res.status(500).json({ success: false, message: 'خطا در حذف فایل.' });
+    }
+};
+
+router.get('/download', downloadJournal);
+router.post('/', protect, upload.single('image'), uploadToArvan);
 router.delete('/', protect, deleteFileFromS3);
 
 export default router;

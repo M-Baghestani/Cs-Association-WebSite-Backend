@@ -1,8 +1,7 @@
-import mongoose, {Schema, Document, mongo} from 'mongoose'
+import mongoose, {Schema, Document} from 'mongoose'
 
 export interface IEvent extends Document{
     title: string;
-    slug:string;
     description:string;
     date:Date;
     location:string;
@@ -14,11 +13,12 @@ export interface IEvent extends Document{
     creator:mongoose.Types.ObjectId;
     registrationStatus: 'SCHEDULED' | 'OPEN' | 'CLOSED';
     registrationOpensAt: Date; 
+    hasQuestions: boolean;
 }
 
 const EventSchema: Schema = new Schema({
   title: { type: String, required: true },
-  slug: { type: String, required: true, unique: true },
+  // slug حذف شد
   description: { type: String, required: true },
   date: { type: Date, required: true },
   location: { type: String, required: true },
@@ -34,6 +34,7 @@ const EventSchema: Schema = new Schema({
     required: true 
   },
   registrationOpensAt: { type: Date, default: Date.now },
+  hasQuestions: { type: Boolean, default: false },
 }, {
   timestamps: true
 });
