@@ -303,4 +303,23 @@ export const uploadReceipt = async (req: any, res: Response) => {
 // 10. حذف رویداد
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
   try {
-    const eventId = req
+    const eventId = req.params.id;
+    if (!isValidId(eventId)) return res.status(404).json({ success: false, message: "رویداد یافت نشد." });
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: "رویداد یافت نشد." });
+    }
+
+    await Registration.deleteMany({ event: eventId });
+    await Event.findByIdAndDelete(eventId);
+
+    res.json({
+      success: true,
+      message: "رویداد و تمام ثبت‌نام‌های آن حذف شدند.",
+    });
+  } catch (error) {
+    console.error("Delete Event Error:", error);
+    res.status(500).json({ success: false, message: "خطا در حذف رویداد." });
+  }
+};
