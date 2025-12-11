@@ -4,50 +4,44 @@ import Event from "../models/Event";
 import Registration from "../models/Registration";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
+// ✅ تابع کمکی برای جلوگیری از کرش کردن سرور با آیدی‌های خراب
+const isValidId = (id: string) => mongoose.Types.ObjectId.isValid(id);
+
 // 1. دریافت لیست رویدادها
 export const getEvents = async (req: Request, res: Response) => {
   try {
-    const events = await Event.aggregate([
-      {
-        $lookup: {
-          from: "registrations",
-          localField: "_id",
-          foreignField: "event",
-          as: "regs"
-        }
-      },
-      {
-        $addFields: {
-          registeredCount: {
-            $size: {
-              $filter: {
-                input: "$regs",
-                as: "r",
-                cond: { $in: ["$$r.status", ["VERIFIED", "PENDING"]] }
-              }
-            }
-          }
-        }
-      },
-      { $project: { regs: 0, __v: 0 } },
-      { $sort: { createdAt: -1 } }
-    ]);
+    const events = await Event.find().sort({ createdAt: -1 }).lean();
 
-    res.status(200).json({ success: true, count: events.length, data: events });
+    const eventsWithRealCount = await Promise.all(
+      events.map(async (event) => {
+        const realCount = await Registration.countDocuments({
+          event: event._id,
+          status: { $in: ["VERIFIED", "PENDING"] },
+        });
+        return { ...event, registeredCount: realCount };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      count: eventsWithRealCount.length,
+      data: eventsWithRealCount,
+    });
   } catch (error) {
     console.error("Error fetching events:", error);
     res.status(500).json({ success: false, message: "خطای سرور" });
   }
 };
 
-// 2. دریافت رویداد با ID
+// 2. دریافت رویداد با ID (جایگزین کامل GetBySlug)
 export const getEventById = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const userId = req.user?._id;
+  const userId = req.user?._id || req.user?.id;
 
   try {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ success: false, message: "رویداد یافت نشد." });
+    // ✅ جلوگیری از ارور CastError
+    if (!isValidId(id)) {
+      return res.status(404).json({ success: false, message: "رویداد یافت نشد (شناسه نامعتبر)." });
     }
 
     const event = await Event.findById(id);
@@ -79,13 +73,19 @@ export const getEventById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 3. ثبت‌نام در رویداد
+// 3. تابع ساختگی برای سازگاری با روت‌های قدیمی (اختیاری)
+export const getEventBySlug = async (req: AuthRequest, res: Response) => {
+    return res.status(404).json({ success: false, message: "استفاده از اسلاگ منسوخ شده است." });
+};
+
+// 4. ثبت‌نام در رویداد
 export const registerForEvent = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  if (!req.user) return res.status(401).json({ success: false, message: "ابتدا وارد شوید." });
-  const userId = req.user._id; 
+  const userId = req.user?._id || req.user?.id; 
 
   const { pricePaid, receiptImage, mobile, telegram, questions, trackingCode } = req.body;
+
+  if (!isValidId(id)) return res.status(404).json({ success: false, message: "رویداد پیدا نشد." });
 
   try {
     const event = await Event.findById(id);
@@ -146,14 +146,23 @@ export const registerForEvent = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 4. ایجاد رویداد (اصلاح شده برای رفع خطای بیلد) 🛠️
+// 5. ایجاد رویداد (بدون اسلاگ)
 export const createEvent = async (req: AuthRequest, res: Response) => {
   try {
     const {
-      title, description, date, location, capacity, isFree, price, thumbnail, registrationStatus, hasQuestions
+      title,
+      description, // فیلد slug حذف شد
+      date,
+      location,
+      capacity,
+      isFree,
+      price,
+      thumbnail,
+      registrationStatus,
+      hasQuestions
     } = req.body;
 
-    const eventData: any = {
+    const eventData = {
       title,
       description,
       date: date ? new Date(date) : new Date(),
@@ -162,30 +171,30 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
       isFree,
       price: price ?? 0,
       thumbnail: thumbnail ?? "",
-      creator: req.user ? req.user._id : null,
+      creator: req.user?._id,
       registrationStatus: registrationStatus || "SCHEDULED",
       registrationOpensAt: new Date(),
       hasQuestions: hasQuestions || false,
     };
 
-    // ✅ تغییر مهم: استفاده از as any برای جلوگیری از خطای TS2339
-    const newEvent = (await Event.create(eventData)) as any;
+    const newEvent = await Event.create(eventData);
 
     return res.status(201).json({
       success: true,
       message: "رویداد با موفقیت ساخته شد.",
       eventId: newEvent._id,
     });
-
   } catch (error: any) {
     console.error("Create Event Error:", error);
     return res.status(500).json({ success: false, message: "خطای داخلی سرور." });
   }
 };
 
-// 5. ویرایش رویداد
+// 6. ویرایش رویداد
 export const updateEvent = async (req: Request, res: Response) => {
   try {
+    if (!isValidId(req.params.id)) return res.status(404).json({ success: false, message: "رویداد یافت نشد" });
+
     const event = await Event.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,
@@ -197,19 +206,17 @@ export const updateEvent = async (req: Request, res: Response) => {
   }
 };
 
-// 6. دریافت ثبت‌نام‌های من
+// 7. دریافت ثبت‌نام‌های من
 export const getMyRegistrations = async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "کاربر شناسایی نشد." });
-    }
-    
-    const userId = req.user._id;
-    
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: "کاربر نامعتبر" });
+
     const registrations = await Registration.find({ user: userId })
       .populate("event", "title date location thumbnail")
       .sort({ registeredAt: -1 });
 
+    // فیلتر کردن رویدادهای حذف شده
     const validRegistrations = registrations.filter((reg) => reg.event != null);
 
     res.status(200).json({ success: true, data: validRegistrations });
@@ -219,19 +226,25 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 7. دریافت وضعیت ثبت نام (با ID)
+// 8. دریافت وضعیت ثبت نام (با ID)
 export const getRegistrationStatus = async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const userId = req.user?._id;
+  // اینجا هم slug و هم id را چک میکنیم چون ممکن است روت قدیمی صدا زده شود
+  const paramId = req.params.id || req.params.slug;
+  const userId = req.user?._id || req.user?.id;
 
   if (!userId) {
     return res.status(200).json({ success: true, isRegistered: false, status: null });
   }
 
+  if (!isValidId(paramId)) {
+      // اگر آیدی معتبر نیست، یعنی رویدادی نیست، پس ثبت نامی هم نیست
+      return res.status(200).json({ success: true, isRegistered: false, status: null });
+  }
+
   try {
     const registration = await Registration.findOne({
       user: userId,
-      event: id,
+      event: paramId,
       status: { $in: ["PENDING", "VERIFIED", "FAILED"] },
     }).select("status pricePaid trackingCode");
 
@@ -251,12 +264,10 @@ export const getRegistrationStatus = async (req: AuthRequest, res: Response) => 
   }
 };
 
-// 8. آپلود رسید
+// 9. آپلود رسید
 export const uploadReceipt = async (req: any, res: Response) => {
   const { id: eventId } = req.params;
-  
-  if (!req.user) return res.status(401).json({ success: false, message: "غیرمجاز" });
-  const userId = req.user._id;
+  const userId = req.user?._id || req.user?.id;
 
   if (!req.file) {
     return res.status(400).json({ success: false, message: "فایل رسید موجود نیست." });
@@ -289,15 +300,7 @@ export const uploadReceipt = async (req: any, res: Response) => {
   }
 };
 
-// 9. حذف رویداد
+// 10. حذف رویداد
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
   try {
-    const eventId = req.params.id;
-    await Registration.deleteMany({ event: eventId });
-    await Event.findByIdAndDelete(eventId);
-    res.json({ success: true, message: "رویداد حذف شد." });
-  } catch (error) {
-    console.error("Delete Event Error:", error);
-    res.status(500).json({ success: false, message: "خطا در حذف رویداد." });
-  }
-};
+    const eventId = req
