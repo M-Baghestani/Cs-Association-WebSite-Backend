@@ -1,10 +1,11 @@
+// src/models/Registration.ts
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IRegistration extends Document {
   user: mongoose.Types.ObjectId;
   event: mongoose.Types.ObjectId;
   registeredAt: Date;
-  status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'PAID' | 'RECEIPT_PENDING';
+  status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'PAID' | 'RECEIPT_PENDING' | 'APPROVED' | 'REJECTED';
   pricePaid: number;
   receiptImage?: string;
   trackingCode?: string;
@@ -20,7 +21,7 @@ const RegistrationSchema: Schema = new Schema({
   
   status: { 
     type: String, 
-    enum: ['PENDING', 'VERIFIED', 'FAILED', 'PAID', 'RECEIPT_PENDING'], 
+    enum: ['PENDING', 'VERIFIED', 'FAILED', 'PAID', 'RECEIPT_PENDING', 'APPROVED', 'REJECTED'], 
     default: 'PENDING' 
   },
   pricePaid: { type: Number, default: 0 },
