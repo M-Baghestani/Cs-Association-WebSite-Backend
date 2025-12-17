@@ -14,7 +14,7 @@ import adminRoutes from './routes/admin.routes';
 import commentRoutes from './routes/comment.routes';
 import journalRoutes from './routes/journal.routes'
 import userRoutes from './routes/user.routes';
-
+import galleryRoutes from './routes/gallery.routes'
 
 
 
@@ -50,7 +50,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/journals', journalRoutes)
 app.use('/api/users', userRoutes);
 
-
+app.use('/api/galleries',galleryRoutes)
 
 
 
